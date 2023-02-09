@@ -7,12 +7,12 @@ OBJDIR=obj
 # GCC compiler settings
 CXX=g++
 CXXINC=-I ./$(INCDIR)/
-CXXFLAGS=-O2 -std=c++11 -fno-stack-protector -fopenmp $(CXXINC)
+CXXFLAGS=-O2 -std=c++11 -fno-stack-protector -fopenmp -lcuda $(CXXINC)
 
 # CUDA compiler settings
 CUDA=/usr/local/cuda
 NVCC=$(CUDA)/bin/nvcc
-NVCCSM=sm_50
+NVCCSM=sm_70
 NVCCINC=-I $(CUDA)/include \
 		-I $(CUDA)/samples/common/inc \
 		-I ./$(3RDDIR)/moderngpu/src \
@@ -37,6 +37,7 @@ all: lca_runner bridges_runner
 
 bridges_runner: bridges_runner.e
 lca_runner: lca_runner.e
+rmq: rmq.e
 
 bridges_test:
 	cd test/bridges && $(MAKE)
@@ -47,6 +48,9 @@ bridges_runner.e: obj/bridges_runner.o $(OBJFILES)
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
 lca_runner.e: $(OBJFILES) obj/lca_runner.o
+	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
+
+rmq.e: $(OBJFILES) obj/rmq.o
 	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
 $(OBJDIR)/%.o: %.cu

@@ -1,5 +1,8 @@
 # euler-meets-cuda
 
+Fork from [stobis/euler-meets-cuda](https://github.com/stobis/euler-meets-cuda/tree/master) to solve RMQ queries with LCA
+queries over a cartesian tree and compare its results with [temporal-hpc/rtxrmq](https://github.com/temporal-hpc/rtxrmq)
+
 ## Contents
 Headers are located in ```include/``` with sources in ```src/```
 - ```include/euler.h``` and ```src/euler.cu``` contain implementation of the Euler Tour and list rank algorithm.
@@ -14,7 +17,7 @@ Header files of all the above contain an explanation of input parameters along w
 ## Cloning and building instructions
 To clone the repository together with 3rd party dependencies
 ```shell
-    git clone https://github.com/stobis/euler-meets-cuda.git
+    git clone git@github.com:temporal-hpc/euler-meets-cuda-rmq.git
     git submodule init
     git submodule update
 ```
@@ -25,6 +28,13 @@ In case of stack overflow problems (e.g. segfaults when generating tests)
 ```shell
     ulimit -s unlimited
 ```
+
+### RMQ
+Build with
+```shell
+    make rmq
+```
+and run as the executable `rmq.e` with the same arguments as the RTX programs
 
 ### Bridges
 To build and run automatic tests

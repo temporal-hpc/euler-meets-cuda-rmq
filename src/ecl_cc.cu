@@ -47,6 +47,8 @@ Authors: Jayadharini Jaiganesh and Martin Burtscher
 #include <stdio.h>
 #include <stdlib.h>
 
+#define __shfl(a, b) __shfl_sync(a, b, 0xffffffff);
+
 static const int Device = 0;
 static const int ThreadsPerBlock = 256;
 static const int warpsize = 32;

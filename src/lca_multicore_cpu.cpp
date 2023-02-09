@@ -6,6 +6,7 @@
 
 #include <memory>
 #include <vector>
+#include <array>
 
 #include <parallel/algorithm>
 #include <parallel/numeric>

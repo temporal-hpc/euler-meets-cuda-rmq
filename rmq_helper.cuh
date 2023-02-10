@@ -127,17 +127,18 @@ __global__ void kernel_rmq_basic(int n, int q, float *x, int2 *rmq, float *out){
 }
 
 
-#define NUM_REQUIRED_ARGS 9
+#define NUM_REQUIRED_ARGS 10
 void print_help(){
-    fprintf(stderr, AC_BOLDGREEN "run as ./rtxrmq <seed> <dev> <n> <bs> <q> <lr> <nt> <alg>\n" AC_RESET
+    fprintf(stderr, AC_BOLDGREEN "run as ./rtxrmq <rep> <seed> <dev> <n> <bs> <q> <lr> <nt> <alg>\n\n" AC_RESET
+                    "rep  = repetitions for avg time"
                     "seed = seed for PRNG\n"
-                    "dev = device ID\n"
-                    "n   = num elements\n"
-                    "bs  = block size for RTX_blocks\n"
-                    "q   = num RMQ querys\n"
-                    "lr  = size of range (-1: randomized)\n"
-                    "nt  = num CPU threads\n"
-                    "alg = algorithm\n"
+                    "dev  = device ID\n"
+                    "n    = num elements\n"
+                    "bs   = block size for RTX_blocks\n"
+                    "q    = num RMQ querys\n"
+                    "lr   = size of range (-1: randomized)\n"
+                    "nt   = num CPU threads\n"
+                    "alg  = algorithm\n"
                 );
 }
 

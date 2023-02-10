@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <fstream>
 #include <stdio.h>
+#include <omp.h>
 
 #include <moderngpu/context.hxx>
 #include <moderngpu/memory.hxx>
@@ -76,29 +77,31 @@ int main(int argc, char *argv[]) {
   if(!check_parameters(argc)){
       exit(EXIT_FAILURE);
   }
-  int seed = atoi(argv[1]);
-  int dev = atoi(argv[2]);
-  int n = atoi(argv[3]);
-  int bs = atoi(argv[4]);
-  int q = atoi(argv[5]);
-  int lr = atoi(argv[6]);
-  int nt = atoi(argv[7]);
-  int alg = atoi(argv[8]);
+  int reps = atoi(argv[1]);
+  int seed = atoi(argv[2]);
+  int dev = atoi(argv[3]);
+  int n = atoi(argv[4]);
+  int bs = atoi(argv[5]);
+  int q = atoi(argv[6]);
+  int lr = atoi(argv[7]);
+  int nt = atoi(argv[8]);
+  int alg = atoi(argv[9]);
   if (lr >= n) {
       fprintf(stderr, "Error: lr can not be bigger than n\n");
       return -1;
   }
 
   printf( "Params:\n"
+          "   reps = %i\n"
           "   seed = %i\n"
-          "   dev = %i\n"
-          AC_GREEN "   n   = %i (~%f GB, float)\n" AC_RESET
-          "   bs = %i\n"
-          AC_GREEN "   q   = %i (~%f GB, int2)\n" AC_RESET
-          "   lr  = %i\n"
-          "   nt  = %i CPU threads\n"
-          "   alg = %i (%s)\n\n",
-          seed, dev, n, sizeof(float)*n/1e9, bs, q, sizeof(int2)*q/1e9, lr, nt, alg, "LCA");
+          "   dev  = %i\n"
+          AC_GREEN "   n    = %i (~%f GB, float)\n" AC_RESET
+          "   bs   = %i\n"
+          AC_GREEN "   q    = %i (~%f GB, int2)\n" AC_RESET
+          "   lr   = %i\n"
+          "   nt   = %i CPU threads\n"
+          "   alg  = %i (%s)\n\n",
+          reps, seed, dev, n, sizeof(float)*n/1e9, bs, q, sizeof(int2)*q/1e9, lr, nt, alg, "LCA");
   cudaSetDevice(dev);
   print_gpu_specs(dev);
 
@@ -113,7 +116,9 @@ int main(int argc, char *argv[]) {
   //printf("done: %f secs\n" AC_RESET, timer.get_elapsed_ms()/1000.0f);
 
   // gen array
-  printf("Creating arrays\n");
+  double t1,t2;
+  printf("Creating arrays............"); fflush(stdout);
+  t1 = omp_get_wtime();
   float *a = new float[n];
   int2 *hq = new int2[q];
   //cudaMemcpy(a, p.first, sizeof(float), cudaMemcpyDeviceToHost);
@@ -129,14 +134,19 @@ int main(int argc, char *argv[]) {
   int2 *Q_rmq;
   CUDA_CHECK( cudaMalloc(&Q_rmq, sizeof(int2)*q) );
   CUDA_CHECK( cudaMemcpy(Q_rmq, hq, sizeof(int2)*q, cudaMemcpyHostToDevice) ); 
+  t2 = omp_get_wtime();
+  printf("done: %f secs\n", t2-t1); fflush(stdout);
 
   int *parents = new int[n];
   int *idx = new int[n];
   float *vals = new float[n];
   
   // build cartesian tree
-  printf("Building cartesian tree\n");
+  printf("Building cartesian tree...."); fflush(stdout);
+  t1 = omp_get_wtime();
   build_tree(parents, idx, vals, a, n);
+  t2 = omp_get_wtime();
+  printf("done: %f secs\n", t2-t1); fflush(stdout);
 
   //print_array(n, a, "A:");
   //print_array(n, parents, "Parents:");
@@ -168,15 +178,18 @@ int main(int argc, char *argv[]) {
 
 
   // solve LCA
-  printf("Solving LCA\n");
+  printf("Solving LCA:\n"); fflush(stdout);
   mgpu::standard_context_t context(0);
   int *d_answers; 
   CUDA_CHECK( cudaMalloc(&d_answers, sizeof(int)*q) );
   //void cuda_lca_inlabel(int N, const int *parents, int Q, const int *queries, int *answers, int batchSize,
   //                    mgpu::context_t &context) {
   // use batchsize = to num of queries
+  t1 = omp_get_wtime();
   cuda_lca_inlabel(n, d_parents, q, Q_lca, d_answers, q, context);
   CUDA_CHECK( cudaDeviceSynchronize() );
+  t2 = omp_get_wtime();
+  printf("done: %f secs\n", t2-t1); fflush(stdout);
 
   //print_gpu_array<<<1,1>>>(q, d_answers);
 

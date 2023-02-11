@@ -1,5 +1,11 @@
+#pragma once
+
 #include <curand_kernel.h>
 #include <unistd.h>
+
+#define SAVE_FILE "data_rmq/data.csv"
+
+#define BSIZE 1024
 
 #define AC_RESET   "\033[0m"
 #define AC_BLACK   "\033[30m"      /* Black */
@@ -260,4 +266,36 @@ __global__ void print_gpu_array(int n, int *m){
             printf("%4i ", m[i]);
     }
     printf("\n");
+}
+
+void write_results(int dev, int alg, int n, int bs, int q, int lr, int reps) {
+    if (!SAVE) return;
+    cudaDeviceProp prop;
+    cudaGetDeviceProperties(&prop, dev);
+    char *device = prop.name;
+
+    FILE *fp;
+    fp = fopen(SAVE_FILE, "a");
+    fprintf(fp, "%s,%s,%i,%i,%i,%i,%i",
+            device,
+            "LCA",
+            reps,
+            n,
+            bs,
+            q,
+            lr);
+    fclose(fp);
+}
+
+void write_results(float time_ms, int q, float construction_time, int reps) {
+    if (!SAVE) return;
+    float time_it = time_ms/reps;
+    FILE *fp;
+    fp = fopen(SAVE_FILE, "a");
+    fprintf(fp, ",%f,%f,%f,%f\n",
+            time_ms/1000.0,
+            (double)q/(time_it/1000.0),
+            (double)time_it*1e6/q,
+            construction_time);
+    fclose(fp);
 }

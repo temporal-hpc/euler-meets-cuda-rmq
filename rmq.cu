@@ -9,6 +9,12 @@
 #include <moderngpu/context.hxx>
 #include <moderngpu/memory.hxx>
 
+#define SAVE 1
+#define MEASURE_POWER 0
+#define CHECK 0
+
+#include "rmq_helper.cuh"
+
 #include "lca.h"
 #include "tree.h"
 #include "utils.h"
@@ -17,9 +23,6 @@
 #include <chrono>
 #include <thread>
 
-#define BSIZE 1024
-
-#include "rmq_helper.cuh"
 
 
 using namespace std;
@@ -177,6 +180,8 @@ int main(int argc, char *argv[]) {
   CUDA_CHECK( cudaDeviceSynchronize() );
 
 
+  write_results(dev, alg, n, bs, q, lr, reps);
+
   // solve LCA
   printf("Solving LCA:\n"); fflush(stdout);
   mgpu::standard_context_t context(0);
@@ -186,7 +191,7 @@ int main(int argc, char *argv[]) {
   //                    mgpu::context_t &context) {
   // use batchsize = to num of queries
   t1 = omp_get_wtime();
-  cuda_lca_inlabel(n, d_parents, q, Q_lca, d_answers, q, context);
+  cuda_lca_inlabel(n, d_parents, q, Q_lca, d_answers, q, context, reps, SAVE, MEASURE_POWER, dev);
   CUDA_CHECK( cudaDeviceSynchronize() );
   t2 = omp_get_wtime();
   printf("done: %f secs\n", t2-t1); fflush(stdout);
@@ -207,14 +212,16 @@ int main(int argc, char *argv[]) {
   //for (int i = 0; i < q; ++i)
     //printf("RMQ query: (%i, %i)   LCA query: (%i, %i)   ans: %f\n", hq[i].x, hq[i].y, lca_queries[2*i], lca_queries[2*i+1], out[i]);
 
-  printf("\nchecking result:\n");
-  float *d_a;
-  cudaMalloc(&d_a, sizeof(float)*n);
-  cudaMemcpy(d_a, a, sizeof(float)*n, cudaMemcpyHostToDevice);
-  float *expected = gpu_rmq_basic(n, q, d_a, Q_rmq);
-  printf(AC_YELLOW "\nchecking result..........................." AC_YELLOW); fflush(stdout);
-  int pass = check_result(a, hq, q, expected, out);
-  printf(AC_YELLOW "%s\n" AC_RESET, pass ? "pass" : "failed");
+  if (CHECK) {
+    printf("\nchecking result:\n");
+    float *d_a;
+    cudaMalloc(&d_a, sizeof(float)*n);
+    cudaMemcpy(d_a, a, sizeof(float)*n, cudaMemcpyHostToDevice);
+    float *expected = gpu_rmq_basic(n, q, d_a, Q_rmq);
+    printf(AC_YELLOW "\nchecking result..........................." AC_YELLOW); fflush(stdout);
+    int pass = check_result(a, hq, q, expected, out);
+    printf(AC_YELLOW "%s\n" AC_RESET, pass ? "pass" : "failed");
+  }
 
 
   printf("Benchmark Finished\n");

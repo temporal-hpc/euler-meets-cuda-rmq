@@ -5,13 +5,15 @@
 #include <fstream>
 #include <stdio.h>
 #include <omp.h>
+#include <cstdio>
+#include <cstdlib>
 
 #include <moderngpu/context.hxx>
 #include <moderngpu/memory.hxx>
 
-#define SAVE 1
+#define SAVE 0
 #define MEASURE_POWER 0
-#define CHECK 0
+#define CHECK 1
 
 #include "rmq_helper.cuh"
 
@@ -55,6 +57,94 @@ int build_tree(int *out_parents, int *out_idx, float *out_val, float *a, int idx
 void build_tree(int *out_parents, int *out_idx, float *out_val, float *a, int n) {
     build_tree(out_parents, out_idx, out_val, a, -1, -1, 0, n-1);
 }
+
+struct Node {
+	Node *parent;
+	Node *left;
+	Node *right;
+	float val;
+	int idx;
+};
+
+void insert_val(Node *&r, Node *&b, float val, int idx) {
+        //printf("%i  %.2f\n", idx, val);
+	Node *q = new Node;
+	q->idx = idx;
+	q->val = val;
+	q->right = nullptr;
+
+	if (b == nullptr) {
+		q->parent = nullptr;
+		q->left = nullptr;
+		r = q;
+		b = q;
+		return;
+	}
+
+	while (b->parent != nullptr && b->parent->val > val) {
+		b = b->parent;
+	}
+	if (b->val < val) {
+		q->parent = b;
+		q->left = nullptr;
+		b->right = q;
+		b = q;
+	} else if (b->parent == nullptr) {
+		q->parent = nullptr;
+		q->left = b;
+		b->parent = q;
+		r = q;
+		b = q;
+	} else {
+		q->parent = b->parent;
+		q->left = b;
+		b->parent->right = q;
+		b->parent = q;
+		b = q;
+	}
+	return;
+}
+
+int tree_to_array(int *out_parents, int *out_idx, float *out_val, Node *r, int cont, int parent) {
+	//printf("%.2f  %i  %i\n", r->val, r->idx, cont);
+	out_parents[cont] = parent;
+	out_idx[r->idx] = cont;
+	out_val[cont] = r->val;
+	int new_cont = cont;
+	if (r->left != nullptr)
+		new_cont = tree_to_array(out_parents, out_idx, out_val, r->left, new_cont+1, cont);
+	if (r->right != nullptr)
+		new_cont = tree_to_array(out_parents, out_idx, out_val, r->right, new_cont+1, cont);
+	return new_cont;
+}
+
+void print_tree(Node *r, int depth) {
+	int indent = 4;
+	if (r->right != nullptr)
+		print_tree(r->right, depth+1);
+
+	for (int i = 0; i < indent*depth; ++i)
+		printf(" ");
+	printf("%.2f  %i\n", r->val, r->idx);
+
+	if (r->left != nullptr)
+		print_tree(r->left, depth+1);
+}
+
+void build_tree_online(int *out_parents, int *out_idx, float *out_val, float *a, int n) {
+	Node *r = nullptr;
+	Node *b = r;
+	//printf("Building tree\n");
+	for (int i = 0; i < n; ++i) {
+		insert_val(r, b, a[i], i);
+            //print_tree(r, 0);
+	}
+	//printf("Tree built\n");
+	//print_tree(r, 0);
+	tree_to_array(out_parents, out_idx, out_val, r, 0, -1);
+	//printf("Array built\n"); fflush(stdout);
+}
+
 
 __global__ void transform_queries(int *Q_lca, int2 *Q_rmq, int n, int *idx) {
   int tid = threadIdx.x + blockIdx.x * blockDim.x;
@@ -119,6 +209,7 @@ int main(int argc, char *argv[]) {
   //printf("done: %f secs\n" AC_RESET, timer.get_elapsed_ms()/1000.0f);
 
   // gen array
+  srand(seed);
   double t1,t2;
   printf("Creating arrays............"); fflush(stdout);
   t1 = omp_get_wtime();
@@ -127,7 +218,7 @@ int main(int argc, char *argv[]) {
   //cudaMemcpy(a, p.first, sizeof(float), cudaMemcpyDeviceToHost);
   //cudaMemcpy(hq, qs.first, sizeof(int2), cudaMemcpyDeviceToHost);
   for (int i = 0; i < n; ++i)
-    a[i] = (rand() % 1000) / 1000.0f;
+    a[i] = (float)rand()/(float)RAND_MAX;
   for (int i = 0; i < q; ++i) {
     int length = lr > 0 ? lr : rand() % (n/100);
     int l = rand() % (n - length-1);
@@ -147,14 +238,9 @@ int main(int argc, char *argv[]) {
   // build cartesian tree
   printf("Building cartesian tree...."); fflush(stdout);
   t1 = omp_get_wtime();
-  build_tree(parents, idx, vals, a, n);
+  build_tree_online(parents, idx, vals, a, n);
   t2 = omp_get_wtime();
   printf("done: %f secs\n", t2-t1); fflush(stdout);
-
-  //print_array(n, a, "A:");
-  //print_array(n, parents, "Parents:");
-  //print_array(n, idx, "Idx:");
-  //print_array(n, vals, "Vals:");
 
   int *d_parents, *d_idx;
   float *d_vals;

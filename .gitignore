@@ -24,3 +24,4 @@ copyToStudent.sh
 # Test bridges
 test/bridges/in/*
 test/bridges/*.csv
+data_rmq/

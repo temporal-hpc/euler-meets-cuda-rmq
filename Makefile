@@ -20,7 +20,7 @@ NVCCINC=-I $(CUDA)/include \
 		
 NVCCFLAGS=-arch $(NVCCSM) -O2 -std=c++11 --expt-extended-lambda -w $(NVCCINC)
 
-LDFLAGS=-L/usr/local/cuda/lib64 -lcudart
+LDFLAGS=-L/usr/local/cuda/lib64 -lcudart -lnvidia-ml
 
 OBJFILES=$(patsubst %.cpp, obj/%.o, $(wildcard *.cpp)) \
 	$(patsubst %.cpp, obj/%.o, $(wildcard src/*.cpp)) \

@@ -19,7 +19,7 @@ namespace emc {
 // Result:
 // answers:     3  0  1
 void cuda_lca_inlabel(int N, const int *parents, int Q, const int *queries, int *answers, int batchSize,
-                      mgpu::context_t &context);
+                      mgpu::context_t &context, int reps, int save, int measure_power, int dev);
 
 void cuda_lca_naive(int N, const int *parents, int Q, const int *queries, int *answers, int batchSize,
                     mgpu::context_t &context);

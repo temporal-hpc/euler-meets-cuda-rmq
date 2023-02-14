@@ -4,9 +4,20 @@
 #include <iomanip>
 #include <fstream>
 #include <stdio.h>
+#include <omp.h>
+#include <cstdio>
+#include <cstdlib>
+#include <stack>
+#include <tuple>
 
 #include <moderngpu/context.hxx>
 #include <moderngpu/memory.hxx>
+
+#define SAVE 0
+#define MEASURE_POWER 0
+#define CHECK 1
+
+#include "rmq_helper.cuh"
 
 #include "lca.h"
 #include "tree.h"
@@ -16,9 +27,6 @@
 #include <chrono>
 #include <thread>
 
-#define BSIZE 1024
-
-#include "rmq_helper.cuh"
 
 
 using namespace std;
@@ -52,6 +60,104 @@ void build_tree(int *out_parents, int *out_idx, float *out_val, float *a, int n)
     build_tree(out_parents, out_idx, out_val, a, -1, -1, 0, n-1);
 }
 
+struct Node {
+	Node *parent;
+	Node *left;
+	Node *right;
+	float val;
+	int idx;
+};
+
+void insert_val(Node *&r, Node *&b, float val, int idx) {
+        //printf("%i  %.2f\n", idx, val);
+	Node *q = new Node;
+	q->idx = idx;
+	q->val = val;
+        q->parent = nullptr;
+        q->left = nullptr;
+	q->right = nullptr;
+
+	if (b == nullptr) {
+		q->parent = nullptr;
+		q->left = nullptr;
+		r = q;
+		b = q;
+		return;
+	}
+
+	while (b->parent != nullptr && b->parent->val > val) {
+		b = b->parent;
+	}
+	if (b->val < val) {
+		q->parent = b;
+		b->right = q;
+		b = q;
+	} else if (b->parent == nullptr) {
+		q->left = b;
+		b->parent = q;
+		r = q;
+		b = q;
+	} else {
+		q->parent = b->parent;
+		q->left = b;
+		b->parent->right = q;
+		b->parent = q;
+		b = q;
+	}
+	return;
+}
+
+void tree_to_array(int *out_parents, int *out_idx, float *out_val, Node *r) {
+  int cont = 0;
+  std::stack<std::pair<Node*, int>> *node_stack = new std::stack<std::pair<Node*, int>>();
+  node_stack->push({r,-1});
+  while (!node_stack->empty()) {
+    auto pc = node_stack->top();
+    node_stack->pop();
+    Node *p = pc.first;
+    int parent = pc.second;
+    //printf("%.2f  %i  %i\n", p->val, p->idx, parent);
+    out_parents[cont] = parent;
+    out_val[cont] = p->val;
+    out_idx[p->idx] = cont;
+    if (p->left != nullptr)
+      node_stack->push({p->left, cont});
+    if (p->right != nullptr)
+      node_stack->push({p->right, cont});
+    cont++;
+  }
+
+  return;
+}
+
+void print_tree(Node *r, int depth) {
+	int indent = 4;
+	if (r->right != nullptr)
+		print_tree(r->right, depth+1);
+
+	for (int i = 0; i < indent*depth; ++i)
+		printf(" ");
+	printf("%.2f  %i\n", r->val, r->idx);
+
+	if (r->left != nullptr)
+		print_tree(r->left, depth+1);
+}
+
+void build_tree_online(int *out_parents, int *out_idx, float *out_val, float *a, int n) {
+	Node *r = nullptr;
+	Node *b = r;
+	//printf("Building tree\n");
+	for (int i = 0; i < n; ++i) {
+		insert_val(r, b, a[i], i);
+            //print_tree(r, 0);
+	}
+	//printf("Tree built\n");
+	//print_tree(r, 0);
+	tree_to_array(out_parents, out_idx, out_val, r);
+	//printf("Array built\n"); fflush(stdout);
+}
+
+
 __global__ void transform_queries(int *Q_lca, int2 *Q_rmq, int n, int *idx) {
   int tid = threadIdx.x + blockIdx.x * blockDim.x;
   if (tid >= n) return;
@@ -76,29 +182,31 @@ int main(int argc, char *argv[]) {
   if(!check_parameters(argc)){
       exit(EXIT_FAILURE);
   }
-  int seed = atoi(argv[1]);
-  int dev = atoi(argv[2]);
-  int n = atoi(argv[3]);
-  int bs = atoi(argv[4]);
-  int q = atoi(argv[5]);
-  int lr = atoi(argv[6]);
-  int nt = atoi(argv[7]);
-  int alg = atoi(argv[8]);
+  int reps = atoi(argv[1]);
+  int seed = atoi(argv[2]);
+  int dev = atoi(argv[3]);
+  int n = atoi(argv[4]);
+  int bs = atoi(argv[5]);
+  int q = atoi(argv[6]);
+  int lr = atoi(argv[7]);
+  int nt = atoi(argv[8]);
+  int alg = atoi(argv[9]);
   if (lr >= n) {
       fprintf(stderr, "Error: lr can not be bigger than n\n");
       return -1;
   }
 
   printf( "Params:\n"
+          "   reps = %i\n"
           "   seed = %i\n"
-          "   dev = %i\n"
-          AC_GREEN "   n   = %i (~%f GB, float)\n" AC_RESET
-          "   bs = %i\n"
-          AC_GREEN "   q   = %i (~%f GB, int2)\n" AC_RESET
-          "   lr  = %i\n"
-          "   nt  = %i CPU threads\n"
-          "   alg = %i (%s)\n\n",
-          seed, dev, n, sizeof(float)*n/1e9, bs, q, sizeof(int2)*q/1e9, lr, nt, alg, "LCA");
+          "   dev  = %i\n"
+          AC_GREEN "   n    = %i (~%f GB, float)\n" AC_RESET
+          "   bs   = %i\n"
+          AC_GREEN "   q    = %i (~%f GB, int2)\n" AC_RESET
+          "   lr   = %i\n"
+          "   nt   = %i CPU threads\n"
+          "   alg  = %i (%s)\n\n",
+          reps, seed, dev, n, sizeof(float)*n/1e9, bs, q, sizeof(int2)*q/1e9, lr, nt, alg, "LCA");
   cudaSetDevice(dev);
   print_gpu_specs(dev);
 
@@ -113,13 +221,18 @@ int main(int argc, char *argv[]) {
   //printf("done: %f secs\n" AC_RESET, timer.get_elapsed_ms()/1000.0f);
 
   // gen array
-  printf("Creating arrays\n");
+  srand(seed);
+  double t1,t2;
+  printf("Creating arrays............"); fflush(stdout);
+  t1 = omp_get_wtime();
   float *a = new float[n];
   int2 *hq = new int2[q];
   //cudaMemcpy(a, p.first, sizeof(float), cudaMemcpyDeviceToHost);
   //cudaMemcpy(hq, qs.first, sizeof(int2), cudaMemcpyDeviceToHost);
-  for (int i = 0; i < n; ++i)
-    a[i] = (rand() % 1000) / 1000.0f;
+  for (int i = 0; i < n; ++i) {
+    a[i] = (float)rand() / (float)RAND_MAX;
+    //a[i] = (float)(n-1-i) / (float)n;
+  }
   for (int i = 0; i < q; ++i) {
     int length = lr > 0 ? lr : rand() % (n/100);
     int l = rand() % (n - length-1);
@@ -129,19 +242,19 @@ int main(int argc, char *argv[]) {
   int2 *Q_rmq;
   CUDA_CHECK( cudaMalloc(&Q_rmq, sizeof(int2)*q) );
   CUDA_CHECK( cudaMemcpy(Q_rmq, hq, sizeof(int2)*q, cudaMemcpyHostToDevice) ); 
+  t2 = omp_get_wtime();
+  printf("done: %f secs\n", t2-t1); fflush(stdout);
 
   int *parents = new int[n];
   int *idx = new int[n];
   float *vals = new float[n];
   
   // build cartesian tree
-  printf("Building cartesian tree\n");
-  build_tree(parents, idx, vals, a, n);
-
-  //print_array(n, a, "A:");
-  //print_array(n, parents, "Parents:");
-  //print_array(n, idx, "Idx:");
-  //print_array(n, vals, "Vals:");
+  printf("Building cartesian tree...."); fflush(stdout);
+  t1 = omp_get_wtime();
+  build_tree_online(parents, idx, vals, a, n);
+  t2 = omp_get_wtime();
+  printf("done: %f secs\n", t2-t1); fflush(stdout);
 
   int *d_parents, *d_idx;
   float *d_vals;
@@ -167,16 +280,21 @@ int main(int argc, char *argv[]) {
   CUDA_CHECK( cudaDeviceSynchronize() );
 
 
+  write_results(dev, alg, n, bs, q, lr, reps);
+
   // solve LCA
-  printf("Solving LCA\n");
+  printf("Solving LCA:\n"); fflush(stdout);
   mgpu::standard_context_t context(0);
   int *d_answers; 
   CUDA_CHECK( cudaMalloc(&d_answers, sizeof(int)*q) );
   //void cuda_lca_inlabel(int N, const int *parents, int Q, const int *queries, int *answers, int batchSize,
   //                    mgpu::context_t &context) {
   // use batchsize = to num of queries
-  cuda_lca_inlabel(n, d_parents, q, Q_lca, d_answers, q, context);
+  t1 = omp_get_wtime();
+  cuda_lca_inlabel(n, d_parents, q, Q_lca, d_answers, q, context, reps, SAVE, MEASURE_POWER, dev);
   CUDA_CHECK( cudaDeviceSynchronize() );
+  t2 = omp_get_wtime();
+  printf("done: %f secs\n", t2-t1); fflush(stdout);
 
   //print_gpu_array<<<1,1>>>(q, d_answers);
 
@@ -194,14 +312,16 @@ int main(int argc, char *argv[]) {
   //for (int i = 0; i < q; ++i)
     //printf("RMQ query: (%i, %i)   LCA query: (%i, %i)   ans: %f\n", hq[i].x, hq[i].y, lca_queries[2*i], lca_queries[2*i+1], out[i]);
 
-  printf("\nchecking result:\n");
-  float *d_a;
-  cudaMalloc(&d_a, sizeof(float)*n);
-  cudaMemcpy(d_a, a, sizeof(float)*n, cudaMemcpyHostToDevice);
-  float *expected = gpu_rmq_basic(n, q, d_a, Q_rmq);
-  printf(AC_YELLOW "\nchecking result..........................." AC_YELLOW); fflush(stdout);
-  int pass = check_result(a, hq, q, expected, out);
-  printf(AC_YELLOW "%s\n" AC_RESET, pass ? "pass" : "failed");
+  if (CHECK) {
+    printf("\nchecking result:\n");
+    float *d_a;
+    cudaMalloc(&d_a, sizeof(float)*n);
+    cudaMemcpy(d_a, a, sizeof(float)*n, cudaMemcpyHostToDevice);
+    float *expected = gpu_rmq_basic(n, q, d_a, Q_rmq);
+    printf(AC_YELLOW "\nchecking result..........................." AC_YELLOW); fflush(stdout);
+    int pass = check_result(a, hq, q, expected, out);
+    printf(AC_YELLOW "%s\n" AC_RESET, pass ? "pass" : "failed");
+  }
 
 
   printf("Benchmark Finished\n");

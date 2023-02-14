@@ -10,13 +10,32 @@
 #include "timer.hpp"
 #include "tree.h"
 #include "utils.h"
+#include "nvmlPower.hpp"
+
+#define AC_RESET   "\033[0m"
+#define AC_BOLDCYAN    "\033[1m\033[36m"      /* Bold Cyan */
+#define SAVE_FILE "data_rmq/data.csv"
 
 #define ll long long
+
 
 using namespace std;
 using namespace mgpu;
 
 namespace emc {
+
+void write_results(float time_ms, int q, float construction_time, int reps, int save) {
+    if (!save) return;
+    float time_it = time_ms/reps;
+    FILE *fp;
+    fp = fopen(SAVE_FILE, "a");
+    fprintf(fp, ",%f,%f,%f,%f\n",
+            time_ms/1000.0,
+            (double)q/(time_it/1000.0),
+            (double)time_it*1e6/q,
+            construction_time);
+    fclose(fp);
+}
 
 inline __device__ long long CudaPackEdge(int from, int to);
 inline __device__ int CudaUnpackEdgeFrom(long long edge);
@@ -28,8 +47,9 @@ inline __device__ int CudaGetEdgeCode(int a, bool toFather);
 inline __device__ bool isEdgeToFather(int edgeCode);
 
 void cuda_lca_inlabel(int N, const int *parents, int Q, const int *queries, int *answers, int batchSize,
-                      mgpu::context_t &context) {
+                      mgpu::context_t &context, int reps, int save, int measure_power, int dev) {
   Timer timer("CUDA Inlabel");
+  printf("Preprocessing tree........................"); fflush(stdout);
 
   int root = 0;
 
@@ -218,72 +238,89 @@ void cuda_lca_inlabel(int N, const int *parents, int Q, const int *queries, int 
       N, context);
 
   context.synchronize();
-  timer.print_and_restart("Preprocessing");
+  //timer.print_and_restart("Preprocessing");
+  double prep_time = timer.stop_and_get_ms();
+  printf("done: %f secs\n", prep_time/1000.0f);
 
-  for (int qStart = 0; qStart < Q; qStart += batchSize) {
-    int queriesToProcess = min(batchSize, Q - qStart);
+  
+  
+  printf(AC_BOLDCYAN "Computing RMQs (%-11s).............." AC_RESET, "LCA"); fflush(stdout);
+  if (measure_power)
+    GPUPowerBegin("LCA", 100, dev);
+  timer.start();
+  for (int rr = 0; rr < reps; ++rr) {
+    for (int qStart = 0; qStart < Q; qStart += batchSize) {
+      int queriesToProcess = min(batchSize, Q - qStart);
 
-    transform(
-        [=] MGPU_DEVICE(int thid) {
-          int x = queries[(qStart + thid) * 2];
-          int y = queries[(qStart + thid) * 2 + 1];
+      transform(
+          [=] MGPU_DEVICE(int thid) {
+            int x = queries[(qStart + thid) * 2];
+            int y = queries[(qStart + thid) * 2 + 1];
 
-          int inlabelX = devInlabel[x];
-          int inlabelY = devInlabel[y];
+            int inlabelX = devInlabel[x];
+            int inlabelY = devInlabel[y];
 
-          if (inlabelX == inlabelY) {
-            answers[qStart + thid] = devLevel[x] < devLevel[y] ? x : y;
-            return;
-          }
-          int i = 31 - __clz(inlabelX ^ inlabelY);
-
-          int common = devAscendant[x] & devAscendant[y];
-          common = ((common >> i) << i);
-
-          int j = __ffs(common) - 1;
-
-          int inlabelZ = (inlabelY >> (j)) << (j);
-          inlabelZ |= (1 << j);
-
-          int suspects[2];
-
-          for (int a = 0; a < 2; a++) {
-            int tmpX;
-            if (a == 0)
-              tmpX = x;
-            else
-              tmpX = y;
-
-            if (devInlabel[tmpX] == inlabelZ) {
-              suspects[a] = tmpX;
-            } else {
-              int k = 31 - __clz(devAscendant[tmpX] & ((1 << j) - 1));
-
-              int inlabelW = (devInlabel[tmpX] >> k) << (k);
-              inlabelW |= (1 << k);
-
-              int w = devHead[inlabelW];
-              suspects[a] = parents[w];
+            if (inlabelX == inlabelY) {
+              answers[qStart + thid] = devLevel[x] < devLevel[y] ? x : y;
+              return;
             }
-          }
+            int i = 31 - __clz(inlabelX ^ inlabelY);
 
-          if (devLevel[suspects[0]] < devLevel[suspects[1]])
-            answers[qStart + thid] = suspects[0];
-          else
-            answers[qStart + thid] = suspects[1];
-        },
-        queriesToProcess, context);
+            int common = devAscendant[x] & devAscendant[y];
+            common = ((common >> i) << i);
 
-        context.synchronize();
+            int j = __ffs(common) - 1;
+
+            int inlabelZ = (inlabelY >> (j)) << (j);
+            inlabelZ |= (1 << j);
+
+            int suspects[2];
+
+            for (int a = 0; a < 2; a++) {
+              int tmpX;
+              if (a == 0)
+                tmpX = x;
+              else
+                tmpX = y;
+
+              if (devInlabel[tmpX] == inlabelZ) {
+                suspects[a] = tmpX;
+              } else {
+                int k = 31 - __clz(devAscendant[tmpX] & ((1 << j) - 1));
+
+                int inlabelW = (devInlabel[tmpX] >> k) << (k);
+                inlabelW |= (1 << k);
+
+                int w = devHead[inlabelW];
+                suspects[a] = parents[w];
+              }
+            }
+
+            if (devLevel[suspects[0]] < devLevel[suspects[1]])
+              answers[qStart + thid] = suspects[0];
+            else
+              answers[qStart + thid] = suspects[1];
+          },
+          queriesToProcess, context);
+
+          context.synchronize();
+    }
   }
+
+  float timems = timer.stop_and_get_ms();
+  float avg_time = timems / (1000.0 * reps);
+  printf(AC_BOLDCYAN "done: %f secs (avg %f secs): [%.2f RMQs/sec, %f nsec/RMQ]\n" AC_RESET, timems/1000.0, avg_time, (double)Q/avg_time, (double)avg_time*1e9/Q);
+  write_results(timems, Q, prep_time, reps, save);
+  if (measure_power)
+    GPUPowerEnd();
 
   CUCHECK(cudaFree(devLevel));
   CUCHECK(cudaFree(devInlabel));
   CUCHECK(cudaFree(devAscendant));
   CUCHECK(cudaFree(devHead));
 
-  timer.print_and_restart("Queries");
-  timer.print_overall();
+  //timer.print_and_restart("Queries");
+  //timer.print_overall();
 }
 
 // CUDA LCA NAIVE

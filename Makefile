@@ -10,7 +10,7 @@ CXXINC=-I ./$(INCDIR)/
 CXXFLAGS=-O2 -std=c++11 -fno-stack-protector -fopenmp -lcuda $(CXXINC)
 
 # CUDA compiler settings
-CUDA=/usr/local/cuda
+CUDA=/opt/cuda
 NVCC=$(CUDA)/bin/nvcc
 NVCCSM=sm_70
 NVCCINC=-I $(CUDA)/include \

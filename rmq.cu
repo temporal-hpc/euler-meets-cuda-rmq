@@ -7,6 +7,8 @@
 #include <omp.h>
 #include <cstdio>
 #include <cstdlib>
+#include <stack>
+#include <tuple>
 
 #include <moderngpu/context.hxx>
 #include <moderngpu/memory.hxx>
@@ -71,6 +73,8 @@ void insert_val(Node *&r, Node *&b, float val, int idx) {
 	Node *q = new Node;
 	q->idx = idx;
 	q->val = val;
+        q->parent = nullptr;
+        q->left = nullptr;
 	q->right = nullptr;
 
 	if (b == nullptr) {
@@ -86,11 +90,9 @@ void insert_val(Node *&r, Node *&b, float val, int idx) {
 	}
 	if (b->val < val) {
 		q->parent = b;
-		q->left = nullptr;
 		b->right = q;
 		b = q;
 	} else if (b->parent == nullptr) {
-		q->parent = nullptr;
 		q->left = b;
 		b->parent = q;
 		r = q;
@@ -105,17 +107,27 @@ void insert_val(Node *&r, Node *&b, float val, int idx) {
 	return;
 }
 
-int tree_to_array(int *out_parents, int *out_idx, float *out_val, Node *r, int cont, int parent) {
-	//printf("%.2f  %i  %i\n", r->val, r->idx, cont);
-	out_parents[cont] = parent;
-	out_idx[r->idx] = cont;
-	out_val[cont] = r->val;
-	int new_cont = cont;
-	if (r->left != nullptr)
-		new_cont = tree_to_array(out_parents, out_idx, out_val, r->left, new_cont+1, cont);
-	if (r->right != nullptr)
-		new_cont = tree_to_array(out_parents, out_idx, out_val, r->right, new_cont+1, cont);
-	return new_cont;
+void tree_to_array(int *out_parents, int *out_idx, float *out_val, Node *r) {
+  int cont = 0;
+  std::stack<std::pair<Node*, int>> *node_stack = new std::stack<std::pair<Node*, int>>();
+  node_stack->push({r,-1});
+  while (!node_stack->empty()) {
+    auto pc = node_stack->top();
+    node_stack->pop();
+    Node *p = pc.first;
+    int parent = pc.second;
+    //printf("%.2f  %i  %i\n", p->val, p->idx, parent);
+    out_parents[cont] = parent;
+    out_val[cont] = p->val;
+    out_idx[p->idx] = cont;
+    if (p->left != nullptr)
+      node_stack->push({p->left, cont});
+    if (p->right != nullptr)
+      node_stack->push({p->right, cont});
+    cont++;
+  }
+
+  return;
 }
 
 void print_tree(Node *r, int depth) {
@@ -141,7 +153,7 @@ void build_tree_online(int *out_parents, int *out_idx, float *out_val, float *a,
 	}
 	//printf("Tree built\n");
 	//print_tree(r, 0);
-	tree_to_array(out_parents, out_idx, out_val, r, 0, -1);
+	tree_to_array(out_parents, out_idx, out_val, r);
 	//printf("Array built\n"); fflush(stdout);
 }
 
@@ -217,8 +229,10 @@ int main(int argc, char *argv[]) {
   int2 *hq = new int2[q];
   //cudaMemcpy(a, p.first, sizeof(float), cudaMemcpyDeviceToHost);
   //cudaMemcpy(hq, qs.first, sizeof(int2), cudaMemcpyDeviceToHost);
-  for (int i = 0; i < n; ++i)
-    a[i] = (float)rand()/(float)RAND_MAX;
+  for (int i = 0; i < n; ++i) {
+    a[i] = (float)rand() / (float)RAND_MAX;
+    //a[i] = (float)(n-1-i) / (float)n;
+  }
   for (int i = 0; i < q; ++i) {
     int length = lr > 0 ? lr : rand() % (n/100);
     int l = rand() % (n - length-1);

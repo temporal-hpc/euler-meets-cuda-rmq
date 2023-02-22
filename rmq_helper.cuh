@@ -2,6 +2,8 @@
 
 #include <curand_kernel.h>
 #include <unistd.h>
+#include <random>
+#include <cmath>
 
 #define SAVE_FILE "data_rmq/data.csv"
 
@@ -298,4 +300,44 @@ void write_results(float time_ms, int q, float construction_time, int reps) {
             (double)time_it*1e6/q,
             construction_time);
     fclose(fp);
+}
+
+int gen_lr(int n, int lr, std::mt19937 gen) {
+    if (lr > 0) {
+        return lr;
+    } else if (lr == -1) {
+        std::uniform_int_distribution<int> dist(0, n-1);
+        return dist(gen);
+    } else if (lr == -2) {
+        std::lognormal_distribution<double> dist(1.5, 1);
+        int x = (int)(dist(gen) * pow(n, 0.7));
+        //printf("after x  %i\n", x); fflush(stdout);
+        while (x < 0 || x > n-1) {
+            x = (int)(dist(gen) * pow(n, 0.7));
+            //printf("in loop x  %i\n", x); fflush(stdout);
+        }
+        return x;
+    } else if (lr == -3) {
+        std::lognormal_distribution<double> dist(1.5, 1);
+        int x = (int)(dist(gen) * pow(n, 0.3));
+        while (x < 0 || x > n-1)
+            x = (int)(dist(gen) * pow(n, 0.3));
+        return x;
+    }
+    return 0;
+}
+
+int2* random_queries(int q, int lr, int n, int seed) {
+    int2 *query = new int2[q];
+    std::mt19937 gen(seed);
+
+    for (int i = 0; i < q; ++i) {
+        int qsize = gen_lr(n, lr, gen);
+        //printf("qsize  %i\n", qsize); fflush(stdout);
+        std::uniform_int_distribution<int> lrand(0, n - qsize-1);
+        int l = lrand(gen);
+        query[i].x = l;
+        query[i].y = l + qsize;
+    }
+    return query;
 }

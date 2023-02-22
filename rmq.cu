@@ -226,19 +226,14 @@ int main(int argc, char *argv[]) {
   printf("Creating arrays............"); fflush(stdout);
   t1 = omp_get_wtime();
   float *a = new float[n];
-  int2 *hq = new int2[q];
+  int2 *hq;
   //cudaMemcpy(a, p.first, sizeof(float), cudaMemcpyDeviceToHost);
   //cudaMemcpy(hq, qs.first, sizeof(int2), cudaMemcpyDeviceToHost);
   for (int i = 0; i < n; ++i) {
     a[i] = (float)rand() / (float)RAND_MAX;
     //a[i] = (float)(n-1-i) / (float)n;
   }
-  for (int i = 0; i < q; ++i) {
-    int length = lr > 0 ? lr : rand() % (n/100);
-    int l = rand() % (n - length-1);
-    hq[i].x = l;
-    hq[i].y = l + length;
-  }
+  hq = random_queries(q, lr, n, seed);
   int2 *Q_rmq;
   CUDA_CHECK( cudaMalloc(&Q_rmq, sizeof(int2)*q) );
   CUDA_CHECK( cudaMemcpy(Q_rmq, hq, sizeof(int2)*q, cudaMemcpyHostToDevice) ); 

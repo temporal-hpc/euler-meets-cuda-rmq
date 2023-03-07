@@ -22,6 +22,9 @@ nb2=${10}
 if [ "$alg" -le 4 ]; then
     nb2=${nb1}
 fi
+if [ "$alg" -ge 7 ]; then
+    nb2=${nb1}
+fi
 lr1=${11}
 lr2=${12}
 outfile_path=data/hmap-${13}-ALG${alg}.csv

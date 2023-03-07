@@ -8,7 +8,7 @@ fi
 dev=${1}
 nt=${2}
 alg=7
-testname=${4}
+testname=${3}
 printf "dev=${0}  nt=${nt}  alg=${alg}  testname=${testname}"
 # small n, many rea/reps
 ./hmap-benchmark.sh ${dev} ${nt} ${alg}  16  16     1 12   26   0 24  0 24  ${testname}

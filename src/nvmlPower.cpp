@@ -88,7 +88,7 @@ void *GPUpowerPollingFunc(void *ptr){
 Start power measurement by spawning a pthread that polls the GPU.
 Function needs to be modified as per usage to handle errors as seen fit.
 */
-void GPUPowerBegin(const char *alg, int ms, int dev){
+void GPUPowerBegin(const char *alg, int ms, int dev, std::string power_file){
     GPU_SAMPLE_MS = ms;
 	int i;
 	// Initialize nvml.
@@ -140,7 +140,7 @@ void GPUPowerBegin(const char *alg, int ms, int dev){
 	// Test thoroughly and ensure the correct device ID is being used.
 	nvmlResult = nvmlDeviceGetHandleByIndex(dev, &nvmlDeviceID);
 	GPUpollThreadStatus = true;
-    GPUfilename = std::string("data_rmq/") + std::string("power-") + std::string(alg) + std::string(".dat");
+    GPUfilename = std::string(power_file);
 	const char *message = "GPU-power";
 	int iret = pthread_create(&GPUpowerPollThread, NULL, GPUpowerPollingFunc, (void*) message);
 	if (iret){

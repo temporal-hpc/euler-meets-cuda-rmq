@@ -215,7 +215,9 @@ int main(int argc, char *argv[]) {
   //printf("done: %f secs\n" AC_RESET, timer.get_elapsed_ms()/1000.0f);
 
   // gen array
-  srand(seed);
+  std::mt19937 gen(seed); // Standard mersenne_twister_engine seeded with rd()
+  std::uniform_real_distribution<> dis(0, 1);
+  //srand(seed);
   double t1,t2;
   printf("Creating arrays............"); fflush(stdout);
   t1 = omp_get_wtime();
@@ -223,9 +225,10 @@ int main(int argc, char *argv[]) {
   int2 *hq;
   //cudaMemcpy(a, p.first, sizeof(float), cudaMemcpyDeviceToHost);
   //cudaMemcpy(hq, qs.first, sizeof(int2), cudaMemcpyDeviceToHost);
-  for (int i = 0; i < n; ++i) {
-    a[i] = (float)rand() / (float)RAND_MAX;
+  for (int i = 0; i < n; ++i){
+    //a[i] = (float)rand() / (float)RAND_MAX;
     //a[i] = (float)(n-1-i) / (float)n;
+    a[i] = dis(gen);
   }
   hq = random_queries_par_cpu(q, lr, n, nt, seed);
   int2 *Q_rmq;
@@ -301,7 +304,7 @@ int main(int argc, char *argv[]) {
   //for (int i = 0; i < q; ++i)
     //printf("RMQ query: (%i, %i)   LCA query: (%i, %i)   ans: %f\n", hq[i].x, hq[i].y, lca_queries[2*i], lca_queries[2*i+1], out[i]);
 
-  if (CHECK) {
+  if(args.check) {
     printf("\nchecking result:\n");
     float *d_a;
     cudaMalloc(&d_a, sizeof(float)*n);

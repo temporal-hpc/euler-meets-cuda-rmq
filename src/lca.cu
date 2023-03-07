@@ -14,7 +14,6 @@
 
 #define AC_RESET   "\033[0m"
 #define AC_BOLDCYAN    "\033[1m\033[36m"      /* Bold Cyan */
-#define SAVE_FILE "data_rmq/data.csv"
 
 #define ll long long
 
@@ -24,11 +23,11 @@ using namespace mgpu;
 
 namespace emc {
 
-void write_results(float time_ms, int q, float construction_time, int reps, int save) {
+void write_results(float time_ms, int q, float construction_time, int reps, int save, string save_file) {
     if (!save) return;
     float time_it = time_ms/reps;
     FILE *fp;
-    fp = fopen(SAVE_FILE, "a");
+    fp = fopen(save_file.c_str(), "a");
     fprintf(fp, ",%f,%f,%f,%f\n",
             time_ms/1000.0,
             (double)q/(time_it/1000.0),
@@ -47,7 +46,7 @@ inline __device__ int CudaGetEdgeCode(int a, bool toFather);
 inline __device__ bool isEdgeToFather(int edgeCode);
 
 void cuda_lca_inlabel(int N, const int *parents, int Q, const int *queries, int *answers, int batchSize,
-                      mgpu::context_t &context, int reps, int save, int measure_power, int dev) {
+                      mgpu::context_t &context, int reps, int save, int measure_power, int dev, string time_file, string power_file) {
   Timer timer("CUDA Inlabel");
   printf("Preprocessing tree........................"); fflush(stdout);
 
@@ -246,7 +245,7 @@ void cuda_lca_inlabel(int N, const int *parents, int Q, const int *queries, int 
   
   printf(AC_BOLDCYAN "Computing RMQs (%-11s).............." AC_RESET, "LCA"); fflush(stdout);
   if (measure_power)
-    GPUPowerBegin("LCA", 100, dev);
+    GPUPowerBegin("LCA", 100, dev, power_file);
   timer.start();
   for (int rr = 0; rr < reps; ++rr) {
     for (int qStart = 0; qStart < Q; qStart += batchSize) {
@@ -310,7 +309,7 @@ void cuda_lca_inlabel(int N, const int *parents, int Q, const int *queries, int 
   float timems = timer.stop_and_get_ms();
   float avg_time = timems / (1000.0 * reps);
   printf(AC_BOLDCYAN "done: %f secs (avg %f secs): [%.2f RMQs/sec, %f nsec/RMQ]\n" AC_RESET, timems/1000.0, avg_time, (double)Q/avg_time, (double)avg_time*1e9/Q);
-  write_results(timems, Q, prep_time, reps, save);
+  write_results(timems, Q, prep_time, reps, save, time_file);
   if (measure_power)
     GPUPowerEnd();
 

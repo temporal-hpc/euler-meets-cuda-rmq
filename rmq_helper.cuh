@@ -4,8 +4,8 @@
 #include <unistd.h>
 #include <random>
 #include <cmath>
-
-#define SAVE_FILE "data_rmq/data.csv"
+#include <omp.h>
+#include <getopt.h>
 
 #define BSIZE 1024
 
@@ -44,6 +44,142 @@
                 << error_str << "'\n";                                         \
     }                                                                          \
   }
+
+#define ARG_BS 1
+#define ARG_REPS 2
+#define ARG_DEV 3
+#define ARG_NT 4
+#define ARG_SEED 5
+#define ARG_CHECK 6
+#define ARG_TIME 7
+#define ARG_POWER 8
+
+struct CmdArgs {
+    int n, q, lr, alg, bs, reps, dev, nt, seed, check, save_time, save_power;
+    std::string time_file, power_file;
+};
+
+#define NUM_REQUIRED_ARGS 10
+void print_help(){
+    fprintf(stderr, AC_BOLDGREEN "run as ./rtxrmq <n> <q> <lr> <alg>\n\n" AC_RESET
+                    "n   = num elements\n"
+                    "q   = num RMQ querys\n"
+                    "lr  = length of range; min 1, max n\n"
+                    "  >0 -> value\n"
+                    "  -1 -> uniform distribution (big values)\n"
+                    "  -2 -> lognormal distribution (medium values)\n"
+                    "  -3 -> lognormal distribution (small values)\n"
+                    "alg = algorithm (always LCA)\n"
+                    "Options:\n"
+                    "   --bs <block size>         block size for RTX_blocks (default: 2^15)\n"
+                    "   --reps <repetitions>      RMQ repeats for the avg time (default: 10)\n"
+                    "   --dev <device ID>         device ID (default: 0)\n"
+                    "   --nt  <thread num>        number of CPU threads\n"
+                    "   --seed <seed>             seed for PRNG\n"
+                    "   --check                   check correctness\n"
+                    "   --save-time=<file>        \n"
+                    "   --save-power=<file>       \n"
+                );
+}
+
+
+CmdArgs get_args(int argc, char *argv[]) {
+    if (argc < 5) {
+        print_help();
+        exit(EXIT_FAILURE);
+    }
+
+    CmdArgs args;
+    args.n = atoi(argv[1]);
+    args.q = atoi(argv[2]);
+    args.lr = atoi(argv[3]);
+    args.alg = atoi(argv[4]);
+    if (!args.n || !args.q || !args.lr) {
+        print_help();
+        exit(EXIT_FAILURE);
+    }
+    if (args.lr > args.n) {
+        fprintf(stderr, "Error: lr=%i > n=%i  (lr must be between '1' and 'n')\n", args.lr, args.n);
+        exit(EXIT_FAILURE);
+    }
+
+    args.bs = 1<<15;
+    args.reps = 10;
+    args.seed = time(0);
+    args.dev = 0;
+    args.check = 0;
+    args.save_time = 0;
+    args.save_power = 0;
+    args.nt = 1;
+    args.time_file = "";
+    args.power_file = "";
+    
+    static struct option long_option[] = {
+        // {name , has_arg, flag, val}
+        {"bs", required_argument, 0, 1},
+        {"reps", required_argument, 0, 2},
+        {"dev", required_argument, 0, 3},
+        {"nt", required_argument, 0, 4},
+        {"seed", required_argument, 0, 5},
+        {"check", no_argument, 0, 6},
+        {"save-time", optional_argument, 0, 7},
+        {"save-power", optional_argument, 0, 8},
+    };
+    int opt, opt_idx;
+    while ((opt = getopt_long(argc, argv, "123", long_option, &opt_idx)) != -1) {
+        if (isdigit(opt))
+                continue;
+        switch (opt) {
+            case ARG_BS:
+                args.bs = atoi(optarg);
+                break;
+            case ARG_REPS:
+                args.reps = atoi(optarg);
+                break;
+            case ARG_DEV:
+                args.dev = atoi(optarg);
+                break;
+            case ARG_NT: 
+                args.nt = atoi(optarg);
+                break;
+            case ARG_SEED:
+                args.seed = atoi(optarg);
+                break;
+            case ARG_CHECK:
+                args.check = 1;
+                break;
+            case ARG_TIME:
+                args.save_time = 1;
+                if (optarg != NULL)
+                    args.time_file = optarg;
+                break;
+            case ARG_POWER:
+                args.save_power = 1;
+                if (optarg != NULL)
+                    args.power_file = optarg;
+                break;
+            default:
+                break;
+        }
+    }
+
+    args.bs = 0;
+
+    printf( "Params:\n"
+            "   reps = %i\n"
+            "   seed = %i\n"
+            "   dev  = %i\n"
+            AC_GREEN "   n    = %i (~%f GB, float)\n" AC_RESET
+            "   bs   = %i\n"
+            AC_GREEN "   q    = %i (~%f GB, int2)\n" AC_RESET
+            "   lr   = %i\n"
+            "   nt   = %i CPU threads\n"
+            "   alg  = %i (%s)\n\n",
+            args.reps, args.seed, args.dev, args.n, sizeof(float)*args.n/1e9, args.bs, args.q,
+            sizeof(int2)*args.q/1e9, args.lr, args.nt, args.alg, "LCA");
+
+    return args;
+}
 
 __global__ void kernel_setup_prng(int n, int seed, curandState *state){
     int id = threadIdx.x + blockIdx.x * blockDim.x;
@@ -134,21 +270,6 @@ __global__ void kernel_rmq_basic(int n, int q, float *x, int2 *rmq, float *out){
     out[tid] = min;
 }
 
-
-#define NUM_REQUIRED_ARGS 10
-void print_help(){
-    fprintf(stderr, AC_BOLDGREEN "run as ./rtxrmq <rep> <seed> <dev> <n> <bs> <q> <lr> <nt> <alg>\n\n" AC_RESET
-                    "rep  = repetitions for avg time"
-                    "seed = seed for PRNG\n"
-                    "dev  = device ID\n"
-                    "n    = num elements\n"
-                    "bs   = block size for RTX_blocks\n"
-                    "q    = num RMQ querys\n"
-                    "lr   = size of range (-1: randomized)\n"
-                    "nt   = num CPU threads\n"
-                    "alg  = algorithm\n"
-                );
-}
 
 bool is_equal(float a, float b) {
     float epsilon = 1e-4f;
@@ -270,14 +391,15 @@ __global__ void print_gpu_array(int n, int *m){
     printf("\n");
 }
 
-void write_results(int dev, int alg, int n, int bs, int q, int lr, int reps) {
-    if (!SAVE) return;
+void write_results(int dev, int alg, int n, int bs, int q, int lr, int reps, CmdArgs args) {
+    if (!args.save_time) return;
+
     cudaDeviceProp prop;
     cudaGetDeviceProperties(&prop, dev);
     char *device = prop.name;
 
     FILE *fp;
-    fp = fopen(SAVE_FILE, "a");
+    fp = fopen(args.time_file.c_str(), "a");
     fprintf(fp, "%s,%s,%i,%i,%i,%i,%i",
             device,
             "LCA",
@@ -289,6 +411,7 @@ void write_results(int dev, int alg, int n, int bs, int q, int lr, int reps) {
     fclose(fp);
 }
 
+/*
 void write_results(float time_ms, int q, float construction_time, int reps) {
     if (!SAVE) return;
     float time_it = time_ms/reps;
@@ -301,6 +424,7 @@ void write_results(float time_ms, int q, float construction_time, int reps) {
             construction_time);
     fclose(fp);
 }
+*/
 
 int gen_lr(int n, int lr, std::mt19937 gen) {
     if (lr > 0) {
@@ -341,3 +465,88 @@ int2* random_queries(int q, int lr, int n, int seed) {
     }
     return query;
 }
+
+void fill_queries_constant(int2 *query, int q, int lr, int n, int nt, int seed){
+    #pragma omp parallel 
+    {
+        int tid = omp_get_thread_num();
+        std::mt19937 gen(seed*tid);
+        int chunk = (q+nt-1)/nt;
+        int begin = chunk*tid;
+        int end   = begin + chunk;
+        int qsize = lr;
+        for(int i=begin; i<end; ++i){
+            std::uniform_int_distribution<int> lrand(0, n-1 - (qsize-1));
+            int l = lrand(gen);
+            query[i].x = l;
+            query[i].y = l + (qsize - 1);
+            //printf("thread %i (l,r) -> (%i, %i)\n\n", tid, query[i].x, query[i].y);
+        }
+    }
+}
+
+
+void fill_queries_uniform(int2 *query, int q, int lr, int n, int nt, int seed){
+    #pragma omp parallel 
+    {
+        int tid = omp_get_thread_num();
+        std::mt19937 gen(seed*tid);
+        std::uniform_int_distribution<int> dist(1, n);
+        int chunk = (q+nt-1)/nt;
+        int begin = chunk*tid;
+        int end   = begin + chunk;
+        for(int i = begin; i < end; ++i){
+            int qsize = dist(gen);
+            std::uniform_int_distribution<int> lrand(0, n-1 - (qsize-1));
+            int l = lrand(gen);
+            query[i].x = l;
+            query[i].y = l + (qsize - 1);
+            //printf("(l,r) -> (%i, %i)\n\n", query[i].x, query[i].y);
+        }
+    }
+}
+
+void fill_queries_lognormal(int2 *query, int q, int lr, int n, int nt, int seed, int scale){
+    #pragma omp parallel 
+    {
+        int tid = omp_get_thread_num();
+        std::mt19937 gen(seed*tid);
+        //std::lognormal_distribution<double> dist_old(1.5, 1.0);
+        std::lognormal_distribution<double> dist(log(scale), 0.3);
+        int chunk = (q+nt-1)/nt;
+        int begin = chunk*tid;
+        int end   = begin + chunk;
+        //printf("fill_queries_lognormal: n=%i q=%i lr=%i  scale=%i\n", n, q, lr, scale);
+        for(int i = begin; i < end; ++i){
+            int qsize;
+            //do{ qsize = (int)(dist_old(gen) * pow(n, 0.7)); /*printf("dist_old gen! qsize=%i\n", qsize);*/}
+            do{ qsize = (int)dist(gen);  /*printf("dist gen! qsize=%i\n", qsize);*/ }
+            while (qsize <= 0 || qsize > n);
+            std::uniform_int_distribution<int> lrand(0, n-1 - (qsize-1));
+            int l = lrand(gen);
+            query[i].x = l;
+            query[i].y = l + (qsize - 1);
+            //printf("qsize=%i (l,r) -> (%i, %i)\n\n", qsize, query[i].x, query[i].y);
+        }
+    }
+}
+
+int2* random_queries_par_cpu(int q, int lr, int n, int nt, int seed) {
+    omp_set_num_threads(nt);
+    int2 *query = new int2[q];
+    if(lr>0){
+        fill_queries_constant(query, q, lr, n, nt, seed);
+    }
+    else if(lr == -1){
+        fill_queries_uniform(query, q, lr, n, nt, seed);
+    }
+    else if(lr == -2){
+        fill_queries_lognormal(query, q, lr, n, nt, seed, (int)pow((double)n,0.7));
+    }
+    else if(lr == -3){
+        fill_queries_lognormal(query, q, lr, n, nt, seed, (int)pow((double)n,0.3));
+    }
+    return query;
+}
+
+

@@ -179,22 +179,16 @@ __global__ void get_vals(float* rmq_ans, int* lca_ans, int n, float *vals) {
 int main(int argc, char *argv[]) {
   std::ios_base::sync_with_stdio(false);
 
-  if(!check_parameters(argc)){
-      exit(EXIT_FAILURE);
-  }
-  int reps = atoi(argv[1]);
-  int seed = atoi(argv[2]);
-  int dev = atoi(argv[3]);
-  int n = atoi(argv[4]);
-  int bs = atoi(argv[5]);
-  int q = atoi(argv[6]);
-  int lr = atoi(argv[7]);
-  int nt = atoi(argv[8]);
-  int alg = atoi(argv[9]);
-  if (lr >= n) {
-      fprintf(stderr, "Error: lr can not be bigger than n\n");
-      return -1;
-  }
+  CmdArgs args = get_args(argc, argv);
+  int reps = args.reps;
+  int seed = args.seed;
+  int dev = args.dev;
+  int n = args.n;
+  int bs = args.bs;
+  int q = args.q;
+  int lr = args.lr;
+  int nt = args.nt;
+  int alg = args.alg;
 
   printf( "Params:\n"
           "   reps = %i\n"
@@ -233,7 +227,7 @@ int main(int argc, char *argv[]) {
     a[i] = (float)rand() / (float)RAND_MAX;
     //a[i] = (float)(n-1-i) / (float)n;
   }
-  hq = random_queries(q, lr, n, seed);
+  hq = random_queries_par_cpu(q, lr, n, nt, seed);
   int2 *Q_rmq;
   CUDA_CHECK( cudaMalloc(&Q_rmq, sizeof(int2)*q) );
   CUDA_CHECK( cudaMemcpy(Q_rmq, hq, sizeof(int2)*q, cudaMemcpyHostToDevice) ); 
@@ -275,7 +269,7 @@ int main(int argc, char *argv[]) {
   CUDA_CHECK( cudaDeviceSynchronize() );
 
 
-  write_results(dev, alg, n, bs, q, lr, reps);
+  write_results(dev, alg, n, bs, q, lr, reps, args);
 
   // solve LCA
   printf("Solving LCA:\n"); fflush(stdout);
@@ -286,7 +280,7 @@ int main(int argc, char *argv[]) {
   //                    mgpu::context_t &context) {
   // use batchsize = to num of queries
   t1 = omp_get_wtime();
-  cuda_lca_inlabel(n, d_parents, q, Q_lca, d_answers, q, context, reps, SAVE, MEASURE_POWER, dev);
+  cuda_lca_inlabel(n, d_parents, q, Q_lca, d_answers, q, context, reps, args.save_time, args.save_power, dev, args.time_file, args.power_file);
   CUDA_CHECK( cudaDeviceSynchronize() );
   t2 = omp_get_wtime();
   printf("done: %f secs\n", t2-t1); fflush(stdout);

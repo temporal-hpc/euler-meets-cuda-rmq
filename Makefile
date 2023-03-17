@@ -18,7 +18,7 @@ NVCCINC=-I $(CUDA)/include \
 		-I ./$(3RDDIR)/moderngpu/src \
 		-I ./$(INCDIR)/ 
 		
-NVCCFLAGS=-arch $(NVCCSM) -O2 -std=c++11 --expt-extended-lambda -w $(NVCCINC)
+NVCCFLAGS=-arch $(NVCCSM) -O2 -std=c++11 --expt-extended-lambda -w -Xcompiler=-fopenmp $(NVCCINC)
 
 LDFLAGS=-L/usr/local/cuda/lib64 -lcudart -lnvidia-ml
 

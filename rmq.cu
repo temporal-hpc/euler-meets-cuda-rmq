@@ -190,17 +190,6 @@ int main(int argc, char *argv[]) {
   int nt = args.nt;
   int alg = args.alg;
 
-  printf( "Params:\n"
-          "   reps = %i\n"
-          "   seed = %i\n"
-          "   dev  = %i\n"
-          AC_GREEN "   n    = %i (~%f GB, float)\n" AC_RESET
-          "   bs   = %i\n"
-          AC_GREEN "   q    = %i (~%f GB, int2)\n" AC_RESET
-          "   lr   = %i\n"
-          "   nt   = %i CPU threads\n"
-          "   alg  = %i (%s)\n\n",
-          reps, seed, dev, n, sizeof(float)*n/1e9, bs, q, sizeof(int2)*q/1e9, lr, nt, alg, "LCA");
   cudaSetDevice(dev);
   print_gpu_specs(dev);
 

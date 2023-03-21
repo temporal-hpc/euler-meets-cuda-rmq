@@ -62,7 +62,7 @@ struct CmdArgs {
 
 #define NUM_REQUIRED_ARGS 10
 void print_help(){
-    fprintf(stderr, AC_BOLDGREEN "run as ./rtxrmq <n> <q> <lr> <alg>\n\n" AC_RESET
+    fprintf(stderr, AC_BOLDGREEN "run as ./rtxrmq <n> <q> <lr>\n\n" AC_RESET
                     "n   = num elements\n"
                     "q   = num RMQ querys\n"
                     "lr  = length of range; min 1, max n\n"
@@ -70,9 +70,7 @@ void print_help(){
                     "  -1 -> uniform distribution (big values)\n"
                     "  -2 -> lognormal distribution (medium values)\n"
                     "  -3 -> lognormal distribution (small values)\n"
-                    "alg = algorithm (always LCA)\n"
                     "Options:\n"
-                    "   --bs <block size>         block size for RTX_blocks (default: 2^15)\n"
                     "   --reps <repetitions>      RMQ repeats for the avg time (default: 10)\n"
                     "   --dev <device ID>         device ID (default: 0)\n"
                     "   --nt  <thread num>        number of CPU threads\n"
@@ -85,7 +83,7 @@ void print_help(){
 
 
 CmdArgs get_args(int argc, char *argv[]) {
-    if (argc < 5) {
+    if (argc < 4) {
         print_help();
         exit(EXIT_FAILURE);
     }
@@ -94,7 +92,7 @@ CmdArgs get_args(int argc, char *argv[]) {
     args.n = atoi(argv[1]);
     args.q = atoi(argv[2]);
     args.lr = atoi(argv[3]);
-    args.alg = atoi(argv[4]);
+    args.alg = 7;
     if (!args.n || !args.q || !args.lr) {
         print_help();
         exit(EXIT_FAILURE);
@@ -133,14 +131,6 @@ CmdArgs get_args(int argc, char *argv[]) {
         if (isdigit(opt))
                 continue;
         switch (opt) {
-            case ARG_BS:
-                args.bs = min(args.n, atoi(optarg));
-                args.nb = args.n / args.bs;
-                break;
-            case ARG_NB:
-                args.nb = min(args.n, atoi(optarg));
-                args.bs = args.n / args.nb;
-                break;
             case ARG_REPS:
                 args.reps = atoi(optarg);
                 break;
@@ -183,9 +173,9 @@ CmdArgs get_args(int argc, char *argv[]) {
             AC_GREEN "   q    = %i (~%f GB, int2)\n" AC_RESET
             "   lr   = %i\n"
             "   nt   = %i CPU threads\n"
-            "   alg  = %i (%s)\n\n",
+            "   alg  = (%s)\n\n",
             args.reps, args.seed, args.dev, args.n, sizeof(float)*args.n/1e9, args.bs, args.q,
-            sizeof(int2)*args.q/1e9, args.lr, args.nt, args.alg, "LCA");
+            sizeof(int2)*args.q/1e9, args.lr, args.nt, "LCA-GPU");
 
     return args;
 }

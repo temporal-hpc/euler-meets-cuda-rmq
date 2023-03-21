@@ -10,7 +10,7 @@ if [ "$#" -ne 3 ]; then
 fi
 dev=${1}
 nt=${2}
-name=${4}
+name=${3}
 
 DATEBEGIN=$(exec date +"%T-%m-%d-%Y (%:z %Z)")
 echo "LCA-GPU BENCHMARK START #DATE = ${DATEBEGIN}"
@@ -18,8 +18,8 @@ echo "LCA-GPU BENCHMARK START #DATE = ${DATEBEGIN}"
 printf "args dev=${dev} nt=${nt} name=${name}\n\n"
 for lr in {-1..-5}
 do
-    #./perf-benchmark.sh      <dev> <nt>   <rea> <reps>   <n1> <n2>  <q1> <q2>   <lr> <filename>
-     ./perf-LCA-benchmark.sh ${dev} ${nt}   16     32       1   26     26   26  ${lr}  ${name}
+    #./perf-LCA-benchmark.sh    <dev> <nt>   <rea> <reps>   <n1> <n2>  <q1> <q2>   <lr> <filename>
+     ./perf-LCA-benchmark.sh  ${dev} ${nt}    16     32       1   26    26   26   ${lr}  ${name}
 done
 DATEEND=$(exec date +"%T-%m-%d-%Y (%:z %Z)")
 printf "FULL LCA-GPU BENCHMARK FINISHED: args dev=${dev} nt=${nt} name=${name}\n"

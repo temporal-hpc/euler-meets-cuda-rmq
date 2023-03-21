@@ -30,14 +30,15 @@ lr2=${12}
 outfile_path=data/hmap-${13}-ALG${alg}.csv
 binary=./rmq.e
 
+# change to bin directory
+cd ../
+
 printf "args:\nalg=${alg}  dev=${dev}  nt=${nt} rea=${rea} reps=${reps}  n=${n1}-${n2} q=${q}  nb=${nb1}-${nb2}     lr=${lr1}-${lr2}   outfile_path=${outfile_path}\n\n"
 [ ! -f ${outfile_path} ] && echo "dev,alg,reps,n,bs,q,lr,t,q/s,ns/q,construction" > ${outfile_path}
 
 DATE=$(exec date +"%T-%m-%d-%Y (%:z %Z)")
 echo "START #DATE = ${DATE}"
 
-# change to bin directory
-cd ../
 
 for(( n=$n1; n<=$n2; n++ ))
 do
@@ -62,6 +63,6 @@ do
     done
 done
 # come back to scripts directory
-cd ../scripts
+cd scripts
 DATE=$(exec date +"%T-%m-%d-%Y (%:z %Z)")
 echo "FINISH #DATE = ${DATE}"

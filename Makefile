@@ -10,7 +10,7 @@ CXXINC=-I ./$(INCDIR)/
 CXXFLAGS=-O2 -std=c++11 -fno-stack-protector -fopenmp -lcuda $(CXXINC)
 
 # CUDA compiler settings
-CUDA=/opt/cuda
+CUDA=/usr/local/cuda
 NVCC=$(CUDA)/bin/nvcc
 NVCCSM=sm_70
 NVCCINC=-I $(CUDA)/include \
@@ -18,7 +18,7 @@ NVCCINC=-I $(CUDA)/include \
 		-I ./$(3RDDIR)/moderngpu/src \
 		-I ./$(INCDIR)/ 
 		
-NVCCFLAGS=-arch $(NVCCSM) -O2 -std=c++11 --expt-extended-lambda -w $(NVCCINC)
+NVCCFLAGS=-arch $(NVCCSM) -O2 -std=c++11 --expt-extended-lambda -w -Xcompiler=-fopenmp $(NVCCINC)
 
 LDFLAGS=-L/usr/local/cuda/lib64 -lcudart -lnvidia-ml
 

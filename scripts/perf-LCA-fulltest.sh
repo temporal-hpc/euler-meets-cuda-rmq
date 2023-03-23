@@ -16,7 +16,7 @@ DATEBEGIN=$(exec date +"%T-%m-%d-%Y (%:z %Z)")
 echo "LCA-GPU BENCHMARK START #DATE = ${DATEBEGIN}"
 
 printf "args dev=${dev} nt=${nt} name=${name}\n\n"
-for lr in {-1..-5}
+for lr in {-1..-3}
 do
     #./perf-LCA-benchmark.sh    <dev> <nt>   <rea> <reps>   <n1> <n2>  <q1> <q2>   <lr> <filename>
      ./perf-LCA-benchmark.sh  ${dev} ${nt}    16     32       1   26    26   26   ${lr}  ${name}

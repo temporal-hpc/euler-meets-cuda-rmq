@@ -55,6 +55,55 @@
 #define ARG_TIME 8
 #define ARG_POWER 9
 
+#include <chrono>
+
+/**
+ * Simple Timer class
+ */
+class TimerGPU {
+public:
+  using timer_t = std::chrono::high_resolution_clock;
+  using time_point_t = timer_t::time_point;
+
+public:
+  TimerGPU() { restart(); }
+
+  void restart(void) {
+    m_start = timer_t::now();
+    m_running = true;
+  }
+
+  void stop(void) {
+    if (m_running)
+      m_stop = timer_t::now();
+  }
+
+  double get_elapsed_s(void) {
+    return get_elapsed<std::chrono::nanoseconds>().count() * 1e-9;
+  }
+
+  double get_elapsed_ms(void) {
+    return get_elapsed<std::chrono::nanoseconds>().count() * 1e-6;
+  }
+
+  double get_elapsed_us(void) {
+    return get_elapsed<std::chrono::nanoseconds>().count() * 1e-3;
+  }
+
+  double get_elapsed_ns(void) {
+    return get_elapsed<std::chrono::nanoseconds>().count() * 1e-0;
+  }
+
+private:
+  bool m_running = false;
+  time_point_t m_start, m_stop;
+
+  template <typename Duration> Duration get_elapsed(void) {
+    time_point_t stop = (m_running) ? timer_t::now() : m_stop;
+    return std::chrono::duration_cast<Duration>(stop - m_start);
+  }
+};
+
 struct CmdArgs {
     int n, q, lr, alg, bs, nb, reps, dev, nt, seed, check, save_time, save_power;
     std::string time_file, power_file;
@@ -340,22 +389,22 @@ float* gpu_rmq_basic(int n, int q, float *devx, int2 *devrmq){
     dim3 grid((q+BSIZE-1)/BSIZE, 1, 1);
     float *hout, *dout;
     printf("Creating out array........................"); fflush(stdout);
-    //Timer timer;
+    TimerGPU timer;
     hout = (float*)malloc(sizeof(float)*q);
     CUDA_CHECK(cudaMalloc(&dout, sizeof(float)*q));
-    //printf("done: %f secs\n", timer.get_elapsed_ms()/1000.0f);
+    printf("done: %f secs\n", timer.get_elapsed_ms()/1000.0f);
     printf(AC_BOLDCYAN "Computing RMQs (%-11s).............." AC_RESET, "GPU BASE"); fflush(stdout);
-    //timer.restart();
+    timer.restart();
     kernel_rmq_basic<<<grid, block>>>(n, q, devx, devrmq, dout);
     CUDA_CHECK(cudaDeviceSynchronize());
-    //timer.stop();
-    //float timems = timer.get_elapsed_ms();
-    //printf(AC_BOLDCYAN "done: %f secs: [%.2f RMQs/sec, %f nsec/RMQ]\n" AC_RESET, timems/1000.0, (double)q/(timems/1000.0), (double)timems*1e6/q);
+    timer.stop();
+    float timems = timer.get_elapsed_ms();
+    printf(AC_BOLDCYAN "done: %f secs: [%.2f RMQs/sec, %f nsec/RMQ]\n" AC_RESET, timems/1000.0, (double)q/(timems/1000.0), (double)timems*1e6/q);
     printf("Copying result to host...................."); fflush(stdout);
-    //timer.restart();
+    timer.restart();
     CUDA_CHECK(cudaMemcpy(hout, dout, sizeof(float)*q, cudaMemcpyDeviceToHost));
     CUDA_CHECK(cudaFree(dout));
-    //printf("done: %f secs\n", timer.get_elapsed_ms()/1000.0f);
+    printf("done: %f secs\n", timer.get_elapsed_ms()/1000.0f);
     //write_results(timems, q, 0);
     return hout;
 }

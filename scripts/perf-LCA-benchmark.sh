@@ -24,6 +24,9 @@ lr=${11}
 outfile_path=../data/perf-${12}-ALG${alg}.csv
 binary=./rmq.e
 
+# change to bin directory
+cd ../
+
 printf "args:\ndev=${dev} nt=${nt} rea=${rea} reps=${reps} n=${n1}-${n2} (dn=${dn}) q=${q1}-${q2} (dq=${dq}) lr=${lr}   outfile_path=${outfile_path}\n\n"
 [ ! -f ${outfile_path} ] && echo "dev,alg,reps,n,bs,q,lr,t,q/s,ns/q,construction" > ${outfile_path}
 DATEBEGIN=$(exec date +"%T-%m-%d-%Y (%:z %Z)")

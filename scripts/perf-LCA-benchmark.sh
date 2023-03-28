@@ -21,7 +21,7 @@ q1=${8}
 q2=${9}
 dq=${10}
 lr=${11}
-outfile_path=../data/perf-${12}-ALG${alg}.csv
+outfile_path=data/perf-${12}-ALG${alg}.csv
 binary=./rmq.e
 
 # change to bin directory

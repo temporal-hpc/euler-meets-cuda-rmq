@@ -39,6 +39,8 @@ do
         for(( R=1; R<=$rea; R++ ))
         do
             printf "\n\n\n\n\n\n\n\n"
+            SEED=${RANDOM}
+            printf "REALIZATION $R -> n=$n q=$q\n"
 		    printf "${binary} $n $q ${lr} --reps $reps --nt $nt --dev $dev --save-time=${outfile_path} --seed ${SEED}\n"
 		            ${binary} $n $q ${lr} --reps $reps --nt $nt --dev $dev --save-time=${outfile_path} --seed ${SEED}
         done

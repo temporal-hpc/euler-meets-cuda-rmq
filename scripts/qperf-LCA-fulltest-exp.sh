@@ -18,8 +18,8 @@ echo "LCA-GPU BENCHMARK START #DATE = ${DATEBEGIN}"
 printf "args dev=${dev} nt=${nt} name=${name}\n\n"
 for lr in {-1..-3}
 do
-    #./perf-LCA-benchmark.sh    <dev> <nt>   <rea> <reps>   <n1> <n2>  <q1> <q2>   <lr> <filename>
-     ./perf-LCA-benchmark.sh  ${dev} ${nt}    16     32       24   24    0   26   ${lr}  ${name}-QPERF
+    #./perf-LCA-benchmark-exp.sh    <dev> <nt>   <rea> <reps>   <n1> <n2>  <q1> <q2>   <lr> <filename>
+     ./perf-LCA-benchmark-exp.sh  ${dev} ${nt}    16     32       24   24    0   26   ${lr}  ${name}-QPERF
 done
 DATEEND=$(exec date +"%T-%m-%d-%Y (%:z %Z)")
 printf "FULL LCA-GPU BENCHMARK FINISHED: args dev=${dev} nt=${nt} name=${name}\n"

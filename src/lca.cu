@@ -23,16 +23,16 @@ using namespace mgpu;
 
 namespace emc {
 
-void write_results(float time_ms, int q, float construction_time, int reps, int save, string save_file) {
+void write_results(float time_ms, int q, float construction_time, int reps, int save, string save_file, size_t mem) {
     if (!save) return;
     float time_it = time_ms/reps;
     FILE *fp;
     fp = fopen(save_file.c_str(), "a");
-    fprintf(fp, ",%f,%f,%f,%f\n",
+    fprintf(fp, ",%f,%f,%f,%f,%f,0\n",
             time_ms/1000.0,
             (double)q/(time_it/1000.0),
             (double)time_it*1e6/q,
-            construction_time);
+            construction_time, mem/1e6);
     fclose(fp);
 }
 
@@ -239,7 +239,8 @@ void cuda_lca_inlabel(int N, const int *parents, int Q, const int *queries, int 
   context.synchronize();
   //timer.print_and_restart("Preprocessing");
   double prep_time = timer.stop_and_get_ms();
-  printf("done: %f secs\n", prep_time/1000.0f);
+  size_t mem = sizeof(int) * (4*N+1);
+  printf("done: %f secs  (%f MB)\n", prep_time/1000.0f, mem/1e6);
 
   
   
@@ -309,7 +310,7 @@ void cuda_lca_inlabel(int N, const int *parents, int Q, const int *queries, int 
   float timems = timer.stop_and_get_ms();
   float avg_time = timems / (1000.0 * reps);
   printf(AC_BOLDCYAN "done: %f secs (avg %f secs): [%.2f RMQs/sec, %f nsec/RMQ]\n" AC_RESET, timems/1000.0, avg_time, (double)Q/avg_time, (double)avg_time*1e9/Q);
-  write_results(timems, Q, prep_time, reps, save, time_file);
+  write_results(timems, Q, prep_time, reps, save, time_file, mem);
   if (measure_power)
     GPUPowerEnd();
 

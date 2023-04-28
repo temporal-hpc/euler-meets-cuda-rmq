@@ -19,7 +19,7 @@ n=${5}
 q=${6}
 lr=${7}
 alg=7
-outfile_path=data/power-${8}-n${n}-q${q}-lr${lr}-ALG${alg}.csv
+outfile_path=data/power-${8}-n${n}-q${q}-lr${lr}-r${reps}-s${seed}-ALG${alg}.csv
 binary=./rmq.e
 
 printf "args:\ndev=${dev} nt=${nt} alg=${alg} rea=${rea} reps=${reps} n=${n} q=${q} lr=${lr} outfile_path=${outfile_path}\n\n"

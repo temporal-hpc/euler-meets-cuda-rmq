@@ -16,4 +16,4 @@ printf "dev=${0}  nt=${nt}  testname=${testname}"
 ./hmap-LCA-benchmark.sh ${dev} ${nt} 8    8    13 19   26   0 24  ${testname}
 
 # large n, small number of rea/reps
-./hmap-LCA-benchmark.sh ${dev} ${nt} 4    4    20 24   26   0 24  ${testname}
+./hmap-LCA-benchmark.sh ${dev} ${nt} 4    4    20 27   26   0 24  ${testname}

@@ -10,7 +10,7 @@ CXXINC=-I ./$(INCDIR)/
 CXXFLAGS=-O2 -std=c++11 -fno-stack-protector -fopenmp -lcuda $(CXXINC)
 
 # CUDA compiler settings
-CUDA=/usr/local/cuda
+CUDA=/opt/cuda
 NVCC=$(CUDA)/bin/nvcc
 NVCCSM=sm_89
 NVCCINC=-I $(CUDA)/include \
@@ -20,7 +20,7 @@ NVCCINC=-I $(CUDA)/include \
 		
 NVCCFLAGS=-arch $(NVCCSM) -O2 -std=c++11 --expt-extended-lambda -w -Xcompiler=-fopenmp $(NVCCINC)
 
-LDFLAGS=-L/usr/local/cuda/lib64 -lcudart -lnvidia-ml
+LDFLAGS=-L${CUDA}/lib64 -lcudart -lnvidia-ml
 
 OBJFILES=$(patsubst %.cpp, obj/%.o, $(wildcard *.cpp)) \
 	$(patsubst %.cpp, obj/%.o, $(wildcard src/*.cpp)) \

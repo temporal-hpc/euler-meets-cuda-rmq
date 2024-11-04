@@ -26,7 +26,7 @@ make rmq
 ```
 and run the executable `rmq.e` with the same arguments as the rtxrmq program.
 
-```shell
+```
 ./rtxrmq <n> <q> <lr>
 
 n   = num elements

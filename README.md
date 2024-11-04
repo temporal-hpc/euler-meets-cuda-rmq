@@ -3,23 +3,13 @@
 Fork from [stobis/euler-meets-cuda](https://github.com/stobis/euler-meets-cuda/tree/master) to solve RMQ queries with LCA
 queries over a cartesian tree and compare its results with [temporal-hpc/rtxrmq](https://github.com/temporal-hpc/rtxrmq)
 
-## Contents
-Headers are located in ```include/``` with sources in ```src/```
-- ```include/euler.h``` and ```src/euler.cu``` contain implementation of the Euler Tour and list rank algorithm.
-- ```include/bridges.h``` and ```src/bridges.cu``` contain implementation of bridges.
-- ```include/lca.h``` and ```src/lca.cu``` contain implementation of lca.
-
-Header files of all the above contain an explanation of input parameters along with a simple input and output.
-
-```./bridges_runner.cu``` and ```./lca_runner.cu``` are working examples use of how to use the methods above in a project.
-
 
 ## Cloning and building instructions
 To clone the repository together with 3rd party dependencies
 ```shell
-    git clone git@github.com:temporal-hpc/euler-meets-cuda-rmq.git
-    git submodule init
-    git submodule update
+git clone git@github.com:temporal-hpc/euler-meets-cuda-rmq.git
+git submodule init
+git submodule update
 ```
 
 You may wish to update Makefile variables: CUDA, NVCC and you GPU's computing capability (NVCCSM) to match your system before building.
@@ -29,49 +19,31 @@ In case of stack overflow problems (e.g. segfaults when generating tests)
     ulimit -s unlimited
 ```
 
-### RMQ
-Build with
+
+### Build and run RMQ
 ```shell
-    make rmq
+make rmq
 ```
-and run as the executable `rmq.e` with the same arguments as the RTX programs
-
-### Bridges
-To build and run automatic tests
-```shell
-    ./bridges_test.sh -t bridgesResult.csv
-```
-
-To run single test
-```shell
-    make bridges_runner
-    ./bridges_runner.e -i [input file] -o [output file] -a [algorithm to use]
-```
-For help run ```./bridges_runner.e -h```
-
-### Lca
-To build and run automatic tests (be advised that default tests take a couple of hours to complete, modify ```test/lca/testVariables.sh``` to run a subset)
-```shell
-    ./lca_test.sh -t lcaResult.csv
-```
-
-To run automatic tests checking correctness
-```shell
-    ./lca_test.sh -c
-```
-
-To run single test
-```shell
-    make lca_runner.e
-    ./lca_runner.e -i [input file] -o [output file] -a [algorithm to use]
-```
-For help run ```./lca_runner.e -h```
-
-
-### Generating plots
-Script generating plots requires matplotlib, run ```pip2 install matplotlib``` to install it.
+and run the executable `rmq.e` with the same arguments as the rtxrmq program.
 
 ```shell
-    python2 test/plot.py {lca,bridges}Result.csv
+./rtxrmq <n> <q> <lr>
+
+n   = num elements
+q   = num RMQ querys
+lr  = length of range; min 1, max n
+  >0 -> value
+  -1 -> uniform distribution (big values)
+  -2 -> lognormal distribution (medium values)
+  -3 -> lognormal distribution (small values)
+Options:
+   --reps <repetitions>      RMQ repeats for the avg time (default: 10)
+   --dev <device ID>         device ID (default: 0)
+   --nt  <thread num>        number of CPU threads
+   --seed <seed>             seed for PRNG
+   --check                   check correctness
+   --save-time=<file>
+   --save-power=<file>
 ```
-By default the plots will be saved to ```testResults/plots```
+
+
